@@ -1,6 +1,7 @@
 from pele.systems.basesystem import BaseSystem
 from playground.molecule.parser import Parser, PymolParser
 from playground.molecule.molecule import Molecule, Protein
+import collections
 
 class MolecularSystem(BaseSystem):
     """ A container for general molecules which are defined as single component graphs.
@@ -14,13 +15,10 @@ class MolecularSystem(BaseSystem):
     """
     
     def __init__(self):
-        # Initialise the member variables
-        self.molecules = {}
-        self.mol_id = 0 # every time a molecule is added increment this integer
-        self.molecule_types = {}
+        self.molecules = []
 
     def select_parser(self, parser='Pymol', args='-qc'):
-        # set up the parser for the system
+        """ Set up the parser for the system. Default is using Pymol PDB parser. """
         if parser == 'Pymol':
             self.parser = PymolParser(args)
         elif parser == 'Basic':
@@ -28,7 +26,23 @@ class MolecularSystem(BaseSystem):
         else:
             # Default parser is PymolParser
             self.parser = PymolParser(args)
-        
+
+    def molecule_types(self):
+        """ Returns a list of the hash values for each molecule."""
+        return [mol.hash_value for mol in self.molecules]
+
+    def unique_molecule_types(self):
+        """ Returns a set containing all of the unique hash values of molecules in the system. """
+        return set(self.molecule_types())
+
+    def molecule_indices_by_hash(self, hash_value):
+        """ Returns a list of molecule indices (to self.molecules) which correspond to hash_value. """
+        return [i for i, mol_type in enumerate(self.molecule_types()) if mol_type == hash_value]
+
+    def get_molecules(self, hash_value):
+        """ Returns a list of molecules with the specified hash value. """
+        return [mol for mol in self.molecules if mol.hash_value == hash_value]
+
     def load_file(self, l_filename, parser='pymol', args='-qc'):
         ''' Function looks at a file and adds every molecule in the file 
         to the molecular system as a separate molecule. Can specify the parser used
@@ -47,16 +61,13 @@ class MolecularSystem(BaseSystem):
         # loop through the graphs returned from the parser
         # and add a molecule to the dictionary each time. 
         for graph, coords in zip(l_graph_list, l_coords_list):
-            self.add_molecule(Molecule(self.mol_id, coords, graph))
-
+            self.add_molecule(Molecule(coords, graph))
 
     def add_molecule(self, molecule):
         ''' Adds a molecule to the molecular system and gives it the current system id.
         Also builds up a profile of how many of each type of molecule there are.
         Distinct molecules are defined using their hash value.'''
-        self.molecules[self.mol_id] = molecule
-        molecule.assign_id(self.mol_id)
-        self.mol_id += 1
+        self.molecules.append(molecule)
         
         # builds up a list of molecule ids that have a certain hash value
         try:
@@ -157,5 +168,5 @@ class ProteinSystem(MolecularSystem):
         
         # loop through the graphs returned from the parser.
         for graph, coords in zip(l_graph_list, l_coords_list):
-            self.add_molecule(Protein(self.mol_id, coords, graph))
+            self.add_molecule(Protein(coords, graph))
     

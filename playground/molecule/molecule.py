@@ -7,9 +7,6 @@ import networkx.algorithms.isomorphism as iso
 import numpy as np
 import os as os
 
-
-
-
 class Atom(object):
     """
     A minimal representation of an atom:
@@ -48,9 +45,6 @@ class Atom(object):
         self.mass = elem.elements[self.symbol]['mass']
         self.radius = elem.elements[self.symbol]['radius']
         self.color = elem.elements[self.symbol]['color']
-
-    def assign_id(self, new_id):
-        self.id = new_id
 
     def __eq__(self, other):
         ''' Function to determine if two atoms are the same type'''
@@ -104,19 +98,14 @@ class Molecule(object):
                      is ever altered.
     """
 
-    def __init__(self, mol_id, coords, topology):
+    def __init__(self, coords, topology):
         """ Initialises an instance of a molecular class """
-        self.id = mol_id
         self.topology = topology
         self.coords = coords
         
         # compute the hash value at initialisation
         self.hash_value = None
         self.__hash__()
-
-    def assign_id(self, new_id):
-        ''' function assigns an id to the molecule '''
-        self.id = new_id
 
     def __hash__(self):
         ''' Define a hashing function for the molecule.
