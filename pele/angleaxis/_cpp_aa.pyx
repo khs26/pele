@@ -7,7 +7,7 @@ in python.
 """
 import numpy as np
 from pele.potentials import _pele
-from pele.potentials import _pythonpotential
+from pele.potentials._pythonpotential import as_cpp_potential
 
 cimport numpy as np
 from libcpp.vector cimport vector as stdvector
@@ -16,7 +16,7 @@ from libcpp cimport bool as cbool
 from pele.potentials cimport _pele
 from pele.potentials._pele cimport shared_ptr
 from pele.potentials._pele cimport BasePotential
-from pele.potentials._pele cimport array_wrap_np, pele_array_to_np
+from pele.potentials._pele cimport array_wrap_np, pele_array_to_np, array_size_t_from_np
 
 # use external c++ class
 cdef extern from "pele/distance.h" namespace "pele":
@@ -41,6 +41,7 @@ cdef extern from "pele/aatopology.h" namespace "pele":
                       shared_ptr[DistanceInterface] distance_function
                       ) except +
         void add_symmetry_rotation(_pele.Array[double]) except +
+        void set_atom_indices(_pele.Array[size_t]) except +
 
     cdef cppclass cppRBTopology "pele::RBTopology":
         cppRBTopology() except +
@@ -117,6 +118,7 @@ cdef class _cdef_RBTopology(_cppBaseTopology):
                                                           self.distance_function)
         for mx in site.symmetries:
             rf.add_symmetry_rotation(array_wrap_np(mx.reshape(-1)))
+        rf.set_atom_indices(array_size_t_from_np(site.atom_indices))
         self.thisptr.get().add_site(rf[0])
         del rf;
         
@@ -148,20 +150,20 @@ cdef class _cdef_MeasureAngleAxisCluster(object):
     def __cinit__(self, topology):
         # set up the cpp topology
         try:
+            # if topology is already a subclass of _cdef_RBTopology then this will work
             self.topology = topology
         except TypeError, e1:
-            try:
+            # topology is just the pythonic topology.  See if it has the cpp topology attached
+            if topology.cpp_topology is not None:
                 self.topology = topology.cpp_topology
-            except (TypeError, AttributeError):
-                print "can't set up the c++ topology"
-                print "first tried", e1
-                raise
+            else:
+                raise TypeError("can't set up the c++ topology needed for _cdef_MeasureAngleAxisCluster")
 
         self.thisptr = shared_ptr[cppMeasureAngleAxisCluster](
                   new cppMeasureAngleAxisCluster(self.topology.thisptr.get()))
     
     def align(self, x1, x2):
-        self.thisptr.get().align(array_wrap_np(x1), array_wrap_np(x1))
+        self.thisptr.get().align(array_wrap_np(x1), array_wrap_np(x2))
 
 cdef class _cdef_TransformAACluster(object):
     cdef shared_ptr[cppTransformAACluster] thisptr
@@ -169,14 +171,14 @@ cdef class _cdef_TransformAACluster(object):
     def __cinit__(self, topology):
         # set up the cpp topology
         try:
+            # if topology is already a subclass of _cdef_RBTopology then this will work
             self.topology = topology
         except TypeError, e1:
-            try:
+            # topology is just the pythonic topology.  See if it has the cpp topology attached
+            if topology.cpp_topology is not None:
                 self.topology = topology.cpp_topology
-            except (TypeError, AttributeError):
-                print "can't set up the c++ topology"
-                print "first tried", e1
-                raise
+            else:
+                raise TypeError("can't set up the c++ topology needed for _cdef_TransformAACluster")
 
         self.thisptr = shared_ptr[cppTransformAACluster](
                   new cppTransformAACluster(self.topology.thisptr.get()))
@@ -192,20 +194,19 @@ cdef class _cdef_RBPotentialWrapper(BasePotential):
     cdef _cdef_RBTopology topology
     def __cinit__(self, topology, potential):
         # wrap the potential so it can be used in the c++ classes
-        if not issubclass(potential.__class__, _pele.BasePotential):
-            potential = _pythonpotential.CppPotentialWrapper(potential)
+        potential = as_cpp_potential(potential)
         cdef _pele.BasePotential pot = potential
 
         # set up the cpp topology
         try:
+            # if topology is already a subclass of _cdef_RBTopology then this will work
             self.topology = topology
         except TypeError, e1:
-            try:
+            # topology is just the pythonic topology.  See if it has the cpp topology attached
+            if topology.cpp_topology is not None:
                 self.topology = topology.cpp_topology
-            except (TypeError, AttributeError):
-                print "can't set up the c++ topology"
-                print "first tried", e1
-                raise
+            else:
+                raise TypeError("can't set up the c++ topology needed for _cdef_RBPotentialWrapper")
         
         assert self.topology is not None
             

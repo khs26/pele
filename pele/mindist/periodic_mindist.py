@@ -1,9 +1,8 @@
 import numpy as np
-from periodic_exact_match import TransformPeriodic
-from pele.utils.rbtools import CoordsAdapter
+from pele.mindist.periodic_exact_match import TransformPeriodic
 from inspect import stack
 
-class MinPermDistBulk(object):
+class MinDistBulk(object):
     """ Obtain the best alignment between two configurations of a periodic system"""
     def __init__(self, boxvec, measure, transform=TransformPeriodic(), niter=10, verbose=False, tol=0.01, 
                  accuracy=0.01):        
@@ -15,7 +14,7 @@ class MinPermDistBulk(object):
         self.tol = tol
         self.boxvec = boxvec
                           
-    def align_fragments(self, coords1, coords2): 
+    def align_fragments(self, x1, x2): 
         """
         Obtain the best alignment between two configurations of a periodic system
         
@@ -23,8 +22,8 @@ class MinPermDistBulk(object):
         ----------
         coords1, coords2 : np.array 
             the structures to align.  X2 will be aligned with X1
-            Both structures are arrays of rigid body com positions and aa vectors
-            
+            Both structures are arrays of cartesian coordinates
+
         Returns
         -------
         a triple of (dist, coords1, coords2). coords1 are the unchanged coords1
@@ -32,8 +31,6 @@ class MinPermDistBulk(object):
         """
 
         if self.verbose:
-            print "Measure:"
-            print self.measure
             print "Transform:"
             print self.transform
             print "Measure.topology:"
@@ -41,36 +38,22 @@ class MinPermDistBulk(object):
             print "Called by", stack()
         
         # we don't want to change the given coordinates
-        coords1 = coords1.copy()
-        coords2 = coords2.copy()
-        
-        x1 = np.copy(coords1)
-        x2 = np.copy(coords2)
+        x1 = np.copy(x1).reshape(-1, self.boxvec.size)
+        x2 = np.copy(x2).reshape(-1, self.boxvec.size)
 
-        self.distbest = self.measure.get_dist(x1, x2)
-        ca1 = CoordsAdapter(coords=x1)
-        ca2 = CoordsAdapter(coords=x2)        
-        
-        dx = ca1.posRigid - ca2.posRigid
-        dx -= np.round(dx / self.boxvec) * self.boxvec
-        ave2 = dx.sum(0)/ca1.nrigid 
+        dist, dx = self.measure.get_dist(x2, x1, with_vector=True)
+        dx = dx.reshape(-1, self.boxvec.size)
+        ave2 = dx.sum(0) / (dx.shape[0])
         self.transform.translate(x2, ave2)
 
-        dist, x2 = self.finalize_best_match(coords1, x2)    
-        return dist, coords1, x2  
+        dist, x2 = self.finalize_best_match(x1, x2)    
+        return dist, x1.ravel(), x2.ravel()  
     
     def __call__(self, coords1, coords2): 
         return self.align_fragments(coords1, coords2)    
 
     def finalize_best_match(self, x1, best_x2):
         ''' do final processing of the best match '''
-        ca = CoordsAdapter(coords=best_x2)
-        ca.posRigid -= np.round(ca.posRigid / self.boxvec) * self.boxvec
-
+        # Calculate the periodic distance between the two structures
         dist = self.measure.get_dist(x1, best_x2)
-#         if (dist - self.distbest) > 1e-6:
-#             raise RuntimeError(dist, self.distbest, "Permutational alignment has increased the distance metric")        
-        if self.verbose:
-#         if True:
-            print "finaldist", dist, "distmin", self.distbest
-        return dist, best_x2
+        return dist, best_x2.ravel()
