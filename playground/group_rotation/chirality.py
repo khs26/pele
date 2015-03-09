@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import my_read_amber as ra
+import read_amber as ra
 import networkx as nx
 import sys
 

@@ -1,4 +1,4 @@
-import playground.group_rotation.my_read_amber as ra
+import playground.group_rotation.read_amber as ra
 import playground.group_rotation.amino_acids as amino
 import playground.group_rotation.chirality as chir
 import playground.group_rotation.group_rotation as gr

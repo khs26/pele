@@ -1,10 +1,135 @@
 import networkx as nx
 import exceptions as ex
-import itertools
+import itertools as it
 import re
 import playground.group_rotation.amino_acids as amino
 import pele.utils.elements as elem
-import sys
+
+class AmberTopologyFile(object):
+    """
+    Python representation of the Amber topology file (.prmtop) described here:
+    http://ambermd.org/formats.html
+    """
+    def __init__(self, filename=None):
+        """
+        Create the dictionaries and, if we provide a filename, run the read
+        method on that filename.
+        """
+        self.format_dict = {}
+        self.data_dict = {}
+        self.ordered_flags = []
+        if filename:
+            self.read_from(filename)
+    def read_from(self, filename):
+        """
+        Read from a .prmtop file to the AmberTopologyFile class.
+        """
+        self.input_filename = filename
+        with open(filename, "r") as topology_file:
+            input_lines = []
+            for line in topology_file:
+                line = line.strip("\n")
+                if line.startswith('%VERSION'):
+                    continue
+                if line.startswith('%FLAG'):
+                    input_lines.append([line])
+                else:
+                    input_lines[-1].append(line)
+        for input_line in input_lines:
+            # Get rid of %FLAG from front and strip whitespace.
+            flag = input_line[0][6:].rstrip(" ")
+            # Store the flags in order, for writing in future.
+            self.ordered_flags.append(flag)
+            # Find length and data type.
+            type_string = re.sub(r'%FORMAT\((.*)\)[ ]+',
+                                 r'\1',
+                                 input_line[1])
+            # Use capturing brackets around the regex to include the delimiter.
+            data_count, data_type, data_format = re.split(r'([a-zA-Z])',
+                                                          type_string)
+            # We either have a length or a length and precision (e.g. 10F8.4).
+            try:
+                data_length, data_precision = re.split(r'\.',
+                                                       data_format)
+                self.format_dict[flag] = (int(data_count),
+                                          data_type,
+                                          int(data_length),
+                                          int(data_precision))
+            except ValueError:
+                data_length = data_format
+                self.format_dict[flag] = (int(data_count),
+                                          data_type,
+                                          int(data_length))
+            data_string = "".join(input_line[2:])
+            # Loop through the data string, taking chunks as long as the data length each time.
+            split_string = [data_string[i:i+int(data_length)]
+                            for i in range(0, len(data_string), int(data_length))]
+            # Store the parsed data in the data_dict.
+            self.data_dict[flag] = [self.data_cast(data, data_type) for data in split_string]
+    def write_to(self, filename):
+        """
+        Write to a .prmtop file from the AmberTopologyFile class.
+        """
+        with open(filename, 'w') as output:
+            for flag in self.ordered_flags:
+                # Write the flag
+                output.write('%FLAG {}'.format(flag).ljust(80))
+                output.write('\n')
+                # Write the format string
+                format_tup = self.format_dict[flag]
+                if len(format_tup) == 3:
+                    format_str = "".join([str(i) for i in format_tup])
+                else:
+                    format_str = "".join([str(i) for i in format_tup[:3]] +
+                                         ["."] +
+                                         [str(format_tup[3])])
+                output.write('%FORMAT({})'.format(format_str).ljust(80))
+                output.write('\n')
+                # Write the data
+                # If we have no data to write, just write a newline (for consistency with
+                # topology files from LeaP)
+                if len(self.data_dict[flag]) == 0:
+                    output.write('\n')
+                    continue
+                # Build the string
+                data_count = format_tup[0]
+                regrouped = it.izip_longest(fillvalue=None, *[iter(self.data_dict[flag])] * data_count)
+                # Define a string for formatting a single unit of data in each of the format cases
+                if format_tup[1].lower() == 'a':
+                    # e.g. '{:<4}' for a string of length 4
+                    format_one = ''.join(['{:<',
+                                          str(format_tup[2]),
+                                          '}'])
+                elif format_tup[1].lower() == 'i':
+                    # e.g. '{:>10d}' for an integer of up to width 10
+                    format_one = ''.join(['{:>',
+                                          str(format_tup[2]),
+                                          'd}'])
+                elif format_tup[1].lower() == 'e':
+                    # e.g. '{:>15.8e}' for an integer of up to width 10
+                    format_one = ''.join(['{:>',
+                                          str(format_tup[2]),
+                                          '.',
+                                          str(format_tup[3]),
+                                          'E}'])
+                for line in regrouped:
+                    data = filter(lambda x: x is not None, line)
+                    output.write((format_one * len(data)).format(*data))
+                    output.write('\n')
+    def data_cast(self, datum, type):
+        """
+        Casts the datum as defined by type.
+
+        a = string
+        i = integer
+        e = float (in exponent notation)
+        """
+        if type.lower() == "a":
+            return str(datum)
+        if type.lower() == "i":
+            return int(datum)
+        if type.lower() == "e":
+            return float(datum)
 
 class Atom(object):
     """ Atom defined from the AMBER topology file. """
@@ -24,18 +149,7 @@ class Atom(object):
         """ Defines the Residue to which the Atom belongs. """
         self.residue = residue
     def __repr__(self):
-        return str(self.index) + " " + self.element + " " + self.name
-    def __cmp__(self, other):
-        cmp_status = None
-        if self.index < other.index:
-            cmp_status = -1
-        elif self.index == other.index:
-            cmp_status = 0
-        elif self.index > other.index:
-            cmp_status = +1
-        else:
-            raise ex.ValueError("Atom comparison didn't work. Are the atom indices correct?")
-        return cmp_status
+        return " ".join([str(self.index), self.element, self.name])
 
 class Residue(object):
     """ Residue defined from the AMBER topology file. """
@@ -57,58 +171,7 @@ class Residue(object):
 class Molecule(object):
     """ Molecule defined from the AMBER topology file. """
     def __init__(self):
-        self.residues = nx.Graph()
         self.atoms = nx.Graph()
-
-def split_len(seq, length):
-    """ Returns a list containing the elements of seq, split into length-long chunks. """
-    return [seq[i:i+length] for i in range(0, len(seq), length)]
-
-def data_cast(datum, type):
-    """
-    Casts the datum as defined by type.
-
-    a = string
-    i = integer
-    e = float (in exponent notation)
-    """
-    if type == "a" or type == "A":
-        return str(datum)
-    if type == "i" or type == "I":
-        return int(datum)
-    if type == "e" or type == "E":
-        return float(datum)
-
-def read_topology(filename):
-    """ Reads a topology file, filename, and returns data blocks containing the topology data. """
-    # Read the topology file to a series of lines. 
-#    prmtop_input_lines = [[]]
-    with open(filename, "r") as topology_file:
-        prmtop_input_lines = []
-        for line in topology_file:
-            line = line.strip("\n")
-            if line.startswith('%VERSION'):
-                continue
-            if line.startswith('%FLAG'):
-                prmtop_input_lines.append([line])
-            else:
-                prmtop_input_lines[-1].append(line)
-    # Parse the input into data blocks, a list containing dictionaries with the following entries.
-    # "flag": flag describing the data block (e.g. atom number, residue type);
-    # "format": describes the format of the data block (e.g. 8a10 is 8 data of type char, length 10);
-    # "data": contains the data, split into blocks of appropriate length and formatted to the correct type.
-    prmtop_data_blocks = {}
-    for input_line in prmtop_input_lines:
-        # Get rid of %FLAG from front and strip whitespace.
-        flag = input_line[0][6:].rstrip(" ")
-        # Find length and data type.
-        data_length = int(re.split("[aEI\.\)]",input_line[1])[1])
-        data_type = re.findall("([a-zA-Z])", input_line[1][8:])[0]
-        # Split the string into chunks of the appropriate size and cast to appropriate data type.
-        split_string = split_len("".join(input_line[2:]), data_length)
-        data = map(data_cast, split_string, itertools.repeat(data_type, len(split_string)))
-        prmtop_data_blocks[flag] = data
-    return prmtop_data_blocks
 
 def create_atoms_and_residues(topology_data):
     """
@@ -118,20 +181,21 @@ def create_atoms_and_residues(topology_data):
     molecule = Molecule()
     # Create a list of atoms from the topology data and add them to the molecule's graph. 
     # The first element of POINTERS is the atom count.
-    atoms = list(itertools.imap(Atom,
+
+    atoms = list(it.imap(Atom,
                                 range(0, (topology_data["POINTERS"][0])),
                                 topology_data["ATOM_NAME"],
                                 topology_data["MASS"],
                                 topology_data["AMBER_ATOM_TYPE"],
                                 topology_data["CHARGE"],
-                                itertools.repeat(molecule)))
+                                it.repeat(molecule)))
     molecule.atoms.add_nodes_from(atoms)
     # Create a list of residues and add them to the molecule's list of residues.
     # The 11th element of POINTERS is the residue count.
-    residues = list(itertools.imap(Residue,
+    residues = list(it.imap(Residue,
                                    range(0, (topology_data["POINTERS"][11])),
                                    topology_data["RESIDUE_LABEL"],
-                                   itertools.repeat(molecule)))
+                                   it.repeat(molecule)))
     molecule.residues.add_nodes_from(residues)
     # Go through the BONDS_INC_HYDROGEN and BONDS_WITHOUT_HYDROGEN lists to extract lists of bonded atoms.
     # Index is i / 3 + 1, because AMBER still uses coordinate indices for runtime speed.
@@ -267,14 +331,19 @@ def default_parameters(topology_filename):
     return group_rotation_dict(parsed, amino.def_parameters)
 
 if __name__ == "__main__":
-    import sys
-    topology_data = read_topology(sys.argv[1])
-    parsed = create_atoms_and_residues(topology_data)
-    group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
+    # import sys
+    topology_data = AmberTopologyFile('/home/khs26/coords.prmtop')
+    topology_data.write_to('dummy')
+    # for k, v in topology_data.data_dict.items():
+    #     print k, ":", v
+    # for k, v in topology_data.format_dict.items():
+    #     print k, ":", v
+    # parsed = create_atoms_and_residues(topology_data)
+    # group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
     #params = default_parameters(sys.argv[1])
-    group_rotation_file(parsed,amino.def_parameters,"atomgroups")
+    # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
 
-    print group_rot_dict.keys()
+    # print group_rot_dict.keys()
     #print parsed
     #print read_amber_coords(sys.argv[2])
     #for item in group_rot_dict:
