@@ -267,6 +267,7 @@ def default_parameters(topology_filename):
     return group_rotation_dict(parsed, amino.def_parameters)
 
 if __name__ == "__main__":
+    import sys
     topology_data = read_topology(sys.argv[1])
     parsed = create_atoms_and_residues(topology_data)
     group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
