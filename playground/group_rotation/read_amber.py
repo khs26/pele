@@ -10,6 +10,10 @@ class AmberTopologyFile(object):
     """
     Python representation of the Amber topology file (.prmtop) described here:
     http://ambermd.org/formats.html
+
+    N.B. The convention in topology files is to count from 1, but Python counts
+    from 0. I'm going to count from 0 and do the conversion back by hand where
+    necessary. This prevents having to force lists to index from 1.
     """
 
     def __init__(self, filename=None):
@@ -20,6 +24,7 @@ class AmberTopologyFile(object):
         self.format_dict = {}
         self.data_dict = {}
         self.ordered_flags = []
+        self.exclusion_list = {}
         self.input_filename = None
         if filename:
             self.read_from(filename)
@@ -222,6 +227,90 @@ class AmberTopologyFile(object):
         res_starts = self.data_dict["RESIDUE_POINTER"]
         res_ends = self.data_dict["RESIDUE_POINTER"][1:] + [self.data_dict["POINTERS"][0]]
         self.data_dict["POINTERS"][28] = max([y - x for x, y in zip(res_starts, res_ends)])
+
+    def get_exclusion_list(self):
+        if not self.exclusion_list:
+            start = 0
+            # Loop through the NUMBER_EXCLUDED_ATOMS list. Each number refers to the number of
+            # elements to take from the EXCLUDED_ATOMS_LIST.
+            #
+            # e.g. if the first two elements were 3 and 5 and EXCLUDED_ATOMS_LIST started:
+            #        2 4 6 3 4 5 6 7
+            #      then atom 1 doesn't interact with the first 3 (atoms 2, 4 and 6) and atom
+            #      2 doesn't interact with the next 5 (atoms 3-7).
+            #
+            # The topology file only records exclusions one way, from lower index to higher index
+            # so if atoms 7 and 9 don't interact, then atom 7 has 9 in its exclusion list, but not
+            # the other way around.
+            #
+            # If an atom has no excluded atoms (or only those with a lower index than itself), then
+            # NUMBER_EXCLUDED_ATOMS has a 1 and EXCLUDED_ATOMS_LIST has a fictitious atom 0 in the
+            # relevant place.
+            for atom_id, num_excluded in enumerate(self.data_dict["NUMBER_EXCLUDED_ATOMS"]):
+                exclusion_list = self.data_dict["EXCLUDED_ATOMS_LIST"][start:start + num_excluded]
+                self.exclusion_list[atom_id] = exclusion_list
+                start += num_excluded
+        return self.exclusion_list
+
+    def add_exclusions(self, atoms_1, atoms_2):
+        """
+        Add exclusions between every atom index in atoms_1 and every atom in atoms_2. Update
+        self.exclusion_list as appropriate.
+        """
+        if not self.exclusion_list:
+            self.get_exclusion_list()
+        # Need to make sure that the indexing is from the lower atom to the higher atom.
+        to_add = [(min(atom_1, atom_2), max(atom_1, atom_2))
+                  for atom_1 in atoms_1 for atom_2 in atoms_2
+                  if atom_2 != atom_1]
+        # print "Adding:", to_add
+        for atom_pair in to_add:
+            # Convert to Python numbering (remember we are counting from zero in Python
+            # and this dictionary, but 1 in our atom indices).
+            atom_id = atom_pair[0] - 1
+            # print "Adding to:", atom_id, self.exclusion_list[atom_id]
+            if self.exclusion_list[atom_id] == [0]:
+                self.exclusion_list[atom_id] = [atom_pair[1]]
+            else:
+                self.exclusion_list[atom_id].append(atom_pair[1])
+        for atom_id in self.exclusion_list:
+            self.exclusion_list[atom_id] = sorted(set(self.exclusion_list[atom_id]))
+
+    def remove_exclusions(self, atoms_1, atoms_2):
+        """
+        Add exclusions between every atom index in atoms_1 and every atom in atoms_2. Update
+        self.exclusion_list as appropriate.
+        """
+        if not self.exclusion_list:
+            self.get_exclusion_list()
+        # Need to make sure that the indexing is from the lower atom to the higher atom.
+        to_remove = [(min(atom_1, atom_2), max(atom_1, atom_2))
+                     for atom_1 in atoms_1 for atom_2 in atoms_2
+                     if atom_2 != atom_1]
+        print "Removing:", to_remove
+        for atom_pair in to_remove:
+            # Convert to Python numbering (remember we are counting from zero in Python
+            # and this dictionary, but 1 in our atom indices).
+            atom_id = atom_pair[0] - 1
+            # print "Removing from:", atom_id, self.exclusion_list[atom_id]
+            self.exclusion_list[atom_id].remove(atom_pair[1])
+            if not self.exclusion_list[atom_id]:
+                self.exclusion_list[atom_id] = [0]
+
+    def update_exclusion_list(self):
+        """
+        Updates self.data_dict["NUMBER_EXCLUDED_ATOMS"] and self.data_dict["EXCLUDED_ATOMS_LIST"]
+        to reflect the new exclusion list (if it has changed).
+
+        Remember the topology file counts from 1 and Python (and the internal dictionaries) from 0.
+        """
+        start = 0
+        for atom_id in self.exclusion_list:
+            # 0..NATOMS-1
+            num_excluded = len(self.exclusion_list[atom_id])
+            self.data_dict["NUMBER_EXCLUDED_ATOMS"][atom_id] = num_excluded
+            self.data_dict["EXCLUDED_ATOMS_LIST"][start:start+num_excluded] = self.exclusion_list[atom_id]
+            start += num_excluded
 
 
 class Atom(object):
@@ -454,9 +543,17 @@ if __name__ == "__main__":
     parsed = AmberMolecule(test_top_file.data_dict)
     parsed.read_coords('../amber/coords.inpcrd')
     print parsed.coords
-    for res in parsed.residues:
-        print res, [res2 for res2 in parsed.residues if res.bonded(res2)]
-    group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
+    for k, v in test_top_file.get_exclusion_list().items():
+        print k+1, sorted(set(v))
+    test_top_file.add_exclusions([55, 57], [60, 61, 62])
+    for k, v in test_top_file.get_exclusion_list().items():
+        print k+1, v
+    test_top_file.remove_exclusions([60, 62], [59, 63])
+    for k, v in test_top_file.get_exclusion_list().items():
+        print k + 1, v
+    # for res in parsed.residues:
+    #     print res, [res2 for res2 in parsed.residues if res.bonded(res2)]
+    # group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
     #params = default_parameters(sys.argv[1])
     # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
     # print group_rot_dict.keys()
