@@ -81,6 +81,7 @@ class AmberTopologyFile(object):
         Write to a .prmtop file from the AmberTopologyFile class.
         """
         self.update_amber_pointers()
+        self.update_exclusion_list()
         with open(filename, 'w') as output:
             for flag in self.ordered_flags:
                 # Write the flag
