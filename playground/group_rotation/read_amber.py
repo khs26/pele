@@ -281,53 +281,68 @@ class Residue(object):
         return str(self.index) + " " + self.name
 
 
-class Molecule(object):
+class AmberMolecule(object):
     """ Molecule defined from the AMBER topology file. """
 
-    def __init__(self):
+    def __init__(self, topology_data=None, coords=None, coords_file=None):
         self.atoms = nx.Graph()
         self.residues = None
+        self.coords = coords
+        if topology_data:
+            self.init_from_topology(topology_data)
+        if coords_file:
+            self.read_coords(coords_file)
 
+    def init_from_topology(self, topology_data):
+        """
+        This function takes a topology data set (topology_data) and returns a Molecule object containing
+        a graph of the atoms and residues and their connectivity.
+        """
+        # Create a list of atoms from the topology data and add them to the molecule's graph.
+        # The first element of POINTERS is the atom count.
+        atom_props = it.izip(topology_data["ATOM_NAME"],
+                             topology_data["MASS"],
+                             topology_data["AMBER_ATOM_TYPE"],
+                             topology_data["CHARGE"])
+        atoms = [Atom(i, *prop, molecule=self) for i, prop in enumerate(atom_props)]
+        self.atoms.add_nodes_from(atoms)
+        # Create a list of residues and add them to the molecule's list of residues.
+        # The 11th element of POINTERS is the residue count.
+        residues = [Residue(i, resname, self) for i, resname in enumerate(topology_data["RESIDUE_LABEL"])]
+        self.residues = residues
+        # Go through the BONDS_INC_HYDROGEN and BONDS_WITHOUT_HYDROGEN lists to extract lists of bonded atoms.
+        # Index is i / 3 + 1, because AMBER still uses coordinate indices for runtime speed/backwards compatibility.
+        first_atoms = [(x / 3) + 1 for x in topology_data["BONDS_INC_HYDROGEN"][0::3] +
+                       topology_data["BONDS_WITHOUT_HYDROGEN"][0::3]]
+        second_atoms = [(x / 3) + 1 for x in topology_data["BONDS_INC_HYDROGEN"][1::3] +
+                        topology_data["BONDS_WITHOUT_HYDROGEN"][1::3]]
+        bond_list = zip(first_atoms, second_atoms)
+        # Next put the appropriate atoms into the appropriate residues.  AMBER specifies the first atom index of
+        # each residue (i.e. no end, hence the exception).
+        starts = [x - 1 for x in topology_data["RESIDUE_POINTER"]]
+        ends = starts[1:] + [len(atoms)]
+        for i, residue in enumerate(residues):
+            residue.add_atoms(atoms[starts[i]:ends[i]])
+        # Now go through bond list and create bonds between the relevant atoms.
+        for bond in bond_list:
+            bonded_atoms = (atoms[(bond[0] - 1)], atoms[(bond[1] - 1)])
+            self.atoms.add_edge(*bonded_atoms)
 
-def create_atoms_and_residues(topology_data):
-    """
-    This function takes a topology data set (topology_data) and returns a Molecule object containing
-    a graph of the atoms and residues and their connectivity.
-    """
-    molecule = Molecule()
-    # Create a list of atoms from the topology data and add them to the molecule's graph. 
-    # The first element of POINTERS is the atom count.
-    atom_props = it.izip(topology_data["ATOM_NAME"],
-                         topology_data["MASS"],
-                         topology_data["AMBER_ATOM_TYPE"],
-                         topology_data["CHARGE"])
-    atoms = [Atom(i, *prop, molecule=molecule) for i, prop in enumerate(atom_props)]
-    molecule.atoms.add_nodes_from(atoms)
-    # Create a list of residues and add them to the molecule's list of residues.
-    # The 11th element of POINTERS is the residue count.
-    residues = [Residue(i, resname, molecule) for i, resname in enumerate(topology_data["RESIDUE_LABEL"])]
-    molecule.residues = residues
-    # Go through the BONDS_INC_HYDROGEN and BONDS_WITHOUT_HYDROGEN lists to extract lists of bonded atoms.
-    # Index is i / 3 + 1, because AMBER still uses coordinate indices for runtime speed.
-    first_atoms = map(lambda x: (x / 3) + 1,
-                      topology_data["BONDS_INC_HYDROGEN"][0::3] + topology_data["BONDS_WITHOUT_HYDROGEN"][0::3])
-    second_atoms = map(lambda x: (x / 3) + 1,
-                       topology_data["BONDS_INC_HYDROGEN"][1::3] + topology_data["BONDS_WITHOUT_HYDROGEN"][1::3])
-    bond_list = zip(first_atoms, second_atoms)
-    # Next put the appropriate atoms into the appropriate residues.  AMBER specifies the first atom index of
-    # each residue (i.e. no end, hence the exception).
-    residue_indices = topology_data["RESIDUE_POINTER"]
-    starts = [x - 1 for x in topology_data["RESIDUE_POINTER"]]
-    ends = starts[1:] + [len(atoms)]
-    for i, residue in enumerate(residues):
-        residue.add_atoms(atoms[starts[i]:ends[i]])
-    # Now go through bond list and create bonds between the relevant atoms.
-    for bond in bond_list:
-        bonded_atoms = (atoms[(bond[0] - 1)], atoms[(bond[1] - 1)])
-        molecule.atoms.add_edge(*bonded_atoms)
-        # if bonded_atoms[0].residue != bonded_atoms[1].residue:
-        # molecule.residues.add_edge(bonded_atoms[0].residue, bonded_atoms[1].residue)
-    return molecule
+    def read_coords(self, filename):
+        field_length = 12
+        self.coords = []
+        with open(filename, "r") as coords_file:
+            # Throw away the first line, since it just contains the name of the molecule.
+            coords_file.readline()
+            # The next line contains the number of atoms.
+            number_of_atoms = int(coords_file.readline())
+            # Later lines contain coordinates in 12-character wide fields.
+            for line in coords_file:
+                line = line.rstrip()
+                self.coords += map(float, [line[i:i + field_length] for i in range(0, len(line), field_length)])
+            # If the number of coordinates is not equal to 3 * number of atoms, raise a RuntimeError.
+            if len(self.coords) != number_of_atoms * 3:
+                raise ex.RuntimeError("Number of coordinates in coords file and number of atoms are inconsistent.")
 
 
 def group_rotation_file(molecule, params, filename):
@@ -422,27 +437,9 @@ def get_rotated_atoms(bond):
     return atom_1, atom_2, rotating_atoms
 
 
-def read_amber_coords(filename):
-    field_length = 12
-    coords = []
-    with open(filename, "r") as coords_file:
-        # Throw away the first line, since it just contains the name of the molecule.
-        coords_file.readline()
-        # The next line contains the number of atoms.
-        number_of_atoms = int(coords_file.readline())
-        # Later lines contain coordinates in 12-character wide fields.
-        for line in coords_file:
-            line = line.rstrip()
-            coords += map(float, [line[i:i + field_length] for i in range(0, len(line), field_length)])
-    # If the number of coordinates is not equal to 3 * number of atoms, raise a RuntimeError. 
-    if len(coords) != number_of_atoms * 3:
-        raise ex.RuntimeError("Number of coordinates in coords file and number of atoms are inconsistent.")
-    return coords
-
-
 def default_parameters(topology_filename):
     topology_data = AmberTopologyFile(topology_filename)
-    parsed = create_atoms_and_residues(topology_data)
+    parsed = AmberMolecule(topology_data.data_dict)
     return group_rotation_dict(parsed, amino.def_parameters)
 
 
@@ -454,15 +451,16 @@ if __name__ == "__main__":
     # print k, ":", v
     # for k, v in topology_data.format_dict.items():
     # print k, ":", v
-    parsed = create_atoms_and_residues(test_top_file.data_dict)
+    parsed = AmberMolecule(test_top_file.data_dict)
+    parsed.read_coords('../amber/coords.inpcrd')
+    print parsed.coords
     for res in parsed.residues:
         print res, [res2 for res2 in parsed.residues if res.bonded(res2)]
     group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
-        #params = default_parameters(sys.argv[1])
-        # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
-
-        # print group_rot_dict.keys()
-        #print parsed
-        #print read_amber_coords(sys.argv[2])
-        #for item in group_rot_dict:
-        #    print item, group_rot_dict[item]
+    #params = default_parameters(sys.argv[1])
+    # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
+    # print group_rot_dict.keys()
+    # print parsed
+    # print read_amber_coords(sys.argv[2])
+    # for item in group_rot_dict:
+    #     print item, group_rot_dict[item]
