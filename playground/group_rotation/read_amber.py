@@ -268,6 +268,15 @@ class Residue(object):
         for atom in atoms:
             atom.set_residue(self)
 
+    def bonded(self, other):
+        """
+        Tests whether this residue is bonded to another residue.
+        """
+        return any(nx.edge_boundary(self.molecule.atoms,
+                                    self.atoms,
+                                    other.atoms)) \
+               and not self is other
+
     def __repr__(self):
         return str(self.index) + " " + self.name
 
@@ -277,6 +286,7 @@ class Molecule(object):
 
     def __init__(self):
         self.atoms = nx.Graph()
+        self.residues = None
 
 
 def create_atoms_and_residues(topology_data):
@@ -287,22 +297,16 @@ def create_atoms_and_residues(topology_data):
     molecule = Molecule()
     # Create a list of atoms from the topology data and add them to the molecule's graph. 
     # The first element of POINTERS is the atom count.
-
-    atoms = list(it.imap(Atom,
-                         range(0, (topology_data["POINTERS"][0])),
-                         topology_data["ATOM_NAME"],
+    atom_props = it.izip(topology_data["ATOM_NAME"],
                          topology_data["MASS"],
                          topology_data["AMBER_ATOM_TYPE"],
-                         topology_data["CHARGE"],
-                         it.repeat(molecule)))
+                         topology_data["CHARGE"])
+    atoms = [Atom(i, *prop, molecule=molecule) for i, prop in enumerate(atom_props)]
     molecule.atoms.add_nodes_from(atoms)
     # Create a list of residues and add them to the molecule's list of residues.
     # The 11th element of POINTERS is the residue count.
-    residues = list(it.imap(Residue,
-                            range(0, (topology_data["POINTERS"][11])),
-                            topology_data["RESIDUE_LABEL"],
-                            it.repeat(molecule)))
-    molecule.residues.add_nodes_from(residues)
+    residues = [Residue(i, resname, molecule) for i, resname in enumerate(topology_data["RESIDUE_LABEL"])]
+    molecule.residues = residues
     # Go through the BONDS_INC_HYDROGEN and BONDS_WITHOUT_HYDROGEN lists to extract lists of bonded atoms.
     # Index is i / 3 + 1, because AMBER still uses coordinate indices for runtime speed.
     first_atoms = map(lambda x: (x / 3) + 1,
@@ -313,19 +317,16 @@ def create_atoms_and_residues(topology_data):
     # Next put the appropriate atoms into the appropriate residues.  AMBER specifies the first atom index of
     # each residue (i.e. no end, hence the exception).
     residue_indices = topology_data["RESIDUE_POINTER"]
+    starts = [x - 1 for x in topology_data["RESIDUE_POINTER"]]
+    ends = starts[1:] + [len(atoms)]
     for i, residue in enumerate(residues):
-        try:
-            start = residue_indices[i] - 1
-            end = residue_indices[i + 1] - 1
-        except IndexError:
-            end = None
-        residue.add_atoms(atoms[start:end])
+        residue.add_atoms(atoms[starts[i]:ends[i]])
     # Now go through bond list and create bonds between the relevant atoms.
     for bond in bond_list:
         bonded_atoms = (atoms[(bond[0] - 1)], atoms[(bond[1] - 1)])
         molecule.atoms.add_edge(*bonded_atoms)
-        if bonded_atoms[0].residue != bonded_atoms[1].residue:
-            molecule.residues.add_edge(bonded_atoms[0].residue, bonded_atoms[1].residue)
+        # if bonded_atoms[0].residue != bonded_atoms[1].residue:
+        # molecule.residues.add_edge(bonded_atoms[0].residue, bonded_atoms[1].residue)
     return molecule
 
 
@@ -372,7 +373,7 @@ def group_rotation_file(molecule, params, filename):
 def group_rotation_dict(molecule, params):
     groups = {}
     for param in params.keys():
-        for residue in molecule.residues.nodes():
+        for residue in molecule.residues:
             if residue.name == param[0]:
                 rotated_atoms = get_rotated_atoms((residue, param[1]))
                 # Create an identifiable group name consisting of [index]_[res_name]_[atom_1]_[atom_2]
@@ -390,6 +391,9 @@ def group_rotation_dict(molecule, params):
 
 
 def get_rotated_atoms(bond):
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # UPDATE ME TO INCLUDE INTER-RES BONDS
+    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     """
     Returns a list of the atoms in the rotating group for the GROUPROTATION script.
     
@@ -405,7 +409,7 @@ def get_rotated_atoms(bond):
             atom_b = residue_atom
     # Remove the edge, find the smallest subgraph and then add the edge back
     residue.molecule.atoms.remove_edge(atom_a, atom_b)
-    rotating_atoms = sorted(nx.connected_components(residue.molecule.atoms)[-1])
+    rotating_atoms = sorted(nx.connected_components(residue.molecule.atoms), key=lambda x: len(x))[0]
     residue.molecule.atoms.add_edge(atom_a, atom_b)
     if atom_a in rotating_atoms:
         atom_1 = atom_b
@@ -449,14 +453,16 @@ if __name__ == "__main__":
     # for k, v in topology_data.data_dict.items():
     # print k, ":", v
     # for k, v in topology_data.format_dict.items():
-    #     print k, ":", v
-    # parsed = create_atoms_and_residues(topology_data)
-    # group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
-    #params = default_parameters(sys.argv[1])
-    # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
+    # print k, ":", v
+    parsed = create_atoms_and_residues(test_top_file.data_dict)
+    for res in parsed.residues:
+        print res, [res2 for res2 in parsed.residues if res.bonded(res2)]
+    group_rot_dict = group_rotation_dict(parsed, amino.def_parameters)
+        #params = default_parameters(sys.argv[1])
+        # group_rotation_file(parsed,amino.def_parameters,"atomgroups")
 
-    # print group_rot_dict.keys()
-    #print parsed
-    #print read_amber_coords(sys.argv[2])
-    #for item in group_rot_dict:
-    #    print item, group_rot_dict[item]
+        # print group_rot_dict.keys()
+        #print parsed
+        #print read_amber_coords(sys.argv[2])
+        #for item in group_rot_dict:
+        #    print item, group_rot_dict[item]
