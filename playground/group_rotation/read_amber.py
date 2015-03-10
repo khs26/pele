@@ -70,6 +70,7 @@ class AmberTopologyFile(object):
         """
         Write to a .prmtop file from the AmberTopologyFile class.
         """
+        self.update_amber_pointers()
         with open(filename, 'w') as output:
             for flag in self.ordered_flags:
                 # Write the flag
@@ -130,6 +131,87 @@ class AmberTopologyFile(object):
             return int(datum)
         if type.lower() == "e":
             return float(datum)
+    def update_amber_pointers(self):
+        """
+        Updates self.data_dict["POINTERS"] to reflect any changes to the
+        topology file. Also see: http://ambermd.org/prmtop.pdf
+
+        A list of pointers is given below. Those marked with * are not
+        currently used. We may want to check that these are set to 0.
+
+        0   NATOM    : total number of atoms
+            NTYPES   : total number of distinct atom types
+            NBONH    : number of bonds containing hydrogen
+            MBONA    : number of bonds not containing hydrogen
+            NTHETH   : number of angles containing hydrogen
+        5   MTHETA   : number of angles not containing hydrogen
+            NPHIH    : number of dihedrals containing hydrogen
+            MPHIA    : number of dihedrals not containing hydrogen
+            *NHPARM   : currently not used
+            *NPARM    : used to determine if addles created prmtop
+        10  NNB      : number of excluded atoms
+            NRES     : number of residues
+            NBONA    : MBONA + number of constraint bonds
+            NTHETA   : MTHETA + number of constraint angles
+            NPHIA    : MPHIA + number of constraint dihedrals
+        15  NUMBND   : number of unique bond types
+            NUMANG   : number of unique angle types
+            NPTRA    : number of unique dihedral types
+            *NATYP    : number of atom types in parameter file, see SOLTY below
+            *NPHB     : number of distinct 10-12 hydrogen bond pair types
+        20  *IFPERT   : set to 1 if perturbation info is to be read in
+            *NBPER    : number of bonds to be perturbed
+            *NGPER    : number of angles to be perturbed
+            *NDPER    : number of dihedrals to be perturbed
+            *MBPER    : number of bonds with atoms completely in perturbed group
+        25  *MGPER    : number of angles with atoms completely in perturbed group
+            *MDPER    : number of dihedrals with atoms completely in perturbed groups
+            IFBOX    : set to 1 if standard periodic box, 2 when truncated octahedral
+            NMXRS    : number of atoms in the largest residue
+            IFCAP    : set to 1 if the CAP option from edit was specified
+        30  NUMEXTRA : number of extra points found in topology
+            NCOPY    : number of PIMD slices / number of beads
+        """
+        # Number of atoms
+        self.data_dict["POINTERS"][0] = len(self.data_dict["ATOM_NAME"])
+        # Number of atom types
+        self.data_dict["POINTERS"][1] = len(set(self.data_dict["ATOM_TYPE_INDEX"]))
+        # Number of bonds containing hydrogen
+        self.data_dict["POINTERS"][2] = len(self.data_dict["BONDS_INC_HYDROGEN"])/3
+        # Number of bonds not containing hydrogen
+        self.data_dict["POINTERS"][3] = len(self.data_dict["BONDS_WITHOUT_HYDROGEN"])/3
+        # Number of angles containing hydrogen
+        self.data_dict["POINTERS"][4] = len(self.data_dict["ANGLES_INC_HYDROGEN"])/4
+        # Number of angles not containing hydrogen
+        self.data_dict["POINTERS"][5] = len(self.data_dict["ANGLES_WITHOUT_HYDROGEN"])/4
+        # Number of dihedrals containing hydrogen
+        self.data_dict["POINTERS"][6] = len(self.data_dict["DIHEDRALS_INC_HYDROGEN"])/5
+        # Number of dihedrals not containing hydrogen
+        self.data_dict["POINTERS"][7] = len(self.data_dict["DIHEDRALS_WITHOUT_HYDROGEN"])/5
+        # Number of excluded atoms
+        self.data_dict["POINTERS"][10] = sum(self.data_dict["NUMBER_EXCLUDED_ATOMS"])
+        # Number of residues
+        self.data_dict["POINTERS"][11] = len(self.data_dict["RESIDUE_LABEL"])
+        # Number of bonds w/o hydrogen + constraint bonds (constraints aren't implemented in
+        # topology files any more).
+        self.data_dict["POINTERS"][12] = self.data_dict["POINTERS"][3]
+        # Number of angles w/o hydrogen + constraint angles
+        self.data_dict["POINTERS"][13] = self.data_dict["POINTERS"][5]
+        # Number of dihedrals w/o hydrogen + constraint dihedrals
+        self.data_dict["POINTERS"][14] = self.data_dict["POINTERS"][7]
+        # Number of bond types
+        self.data_dict["POINTERS"][15] = len(self.data_dict["BOND_FORCE_CONSTANT"])
+        # Number of angle types
+        self.data_dict["POINTERS"][16] = len(self.data_dict["ANGLE_FORCE_CONSTANT"])
+        # Number of dihedral types
+        self.data_dict["POINTERS"][17] = len(self.data_dict["DIHEDRAL_FORCE_CONSTANT"])
+        # Number of SOLTY atom types (this isn't used, but the value seems to be set, I
+        # include it for consistency with LeaP).
+        self.data_dict["POINTERS"][18] = len(self.data_dict["SOLTY"])
+        # Largest number of atoms in any residue
+        res_starts = self.data_dict["RESIDUE_POINTER"]
+        res_ends = self.data_dict["RESIDUE_POINTER"][1:] + [self.data_dict["POINTERS"][0]]
+        self.data_dict["POINTERS"][28] = max([y - x for x, y in zip(res_starts, res_ends)])
 
 class Atom(object):
     """ Atom defined from the AMBER topology file. """
@@ -332,7 +414,7 @@ def default_parameters(topology_filename):
 
 if __name__ == "__main__":
     # import sys
-    topology_data = AmberTopologyFile('/home/khs26/coords.prmtop')
+    topology_data = AmberTopologyFile('../amber/coords.prmtop')
     topology_data.write_to('dummy')
     # for k, v in topology_data.data_dict.items():
     #     print k, ":", v
