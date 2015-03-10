@@ -157,8 +157,8 @@ class AmberTopologyFile(object):
         5   MTHETA   : number of angles not containing hydrogen
             NPHIH    : number of dihedrals containing hydrogen
             MPHIA    : number of dihedrals not containing hydrogen
-            *NHPARM   : currently not used
-            *NPARM    : used to determine if addles created prmtop
+            *NHPARM  : currently not used
+            *NPARM   : used to determine if addles created prmtop
         10  NNB      : number of excluded atoms
             NRES     : number of residues
             NBONA    : MBONA + number of constraint bonds
@@ -167,15 +167,15 @@ class AmberTopologyFile(object):
         15  NUMBND   : number of unique bond types
             NUMANG   : number of unique angle types
             NPTRA    : number of unique dihedral types
-            *NATYP    : number of atom types in parameter file, see SOLTY below
-            *NPHB     : number of distinct 10-12 hydrogen bond pair types
-        20  *IFPERT   : set to 1 if perturbation info is to be read in
-            *NBPER    : number of bonds to be perturbed
-            *NGPER    : number of angles to be perturbed
-            *NDPER    : number of dihedrals to be perturbed
-            *MBPER    : number of bonds with atoms completely in perturbed group
-        25  *MGPER    : number of angles with atoms completely in perturbed group
-            *MDPER    : number of dihedrals with atoms completely in perturbed groups
+            *NATYP   : number of atom types in parameter file, see SOLTY below
+            *NPHB    : number of distinct 10-12 hydrogen bond pair types
+        20  *IFPERT  : set to 1 if perturbation info is to be read in
+            *NBPER   : number of bonds to be perturbed
+            *NGPER   : number of angles to be perturbed
+            *NDPER   : number of dihedrals to be perturbed
+            *MBPER   : number of bonds with atoms completely in perturbed group
+        25  *MGPER   : number of angles with atoms completely in perturbed group
+            *MDPER   : number of dihedrals with atoms completely in perturbed groups
             IFBOX    : set to 1 if standard periodic box, 2 when truncated octahedral
             NMXRS    : number of atoms in the largest residue
             IFCAP    : set to 1 if the CAP option from edit was specified
