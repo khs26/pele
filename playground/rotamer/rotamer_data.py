@@ -1,7 +1,7 @@
 import numpy as np
 import tables as ts
 import playground.group_rotation.amino_acids as amino
-import playground.group_rotation.my_read_amber as ra
+import pele.amber.read_amber as ra
 import playground.group_rotation.chirality as chir
 import networkx as nx
 
