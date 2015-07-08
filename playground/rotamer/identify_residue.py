@@ -21,11 +21,6 @@ def res_atom_graph(molecule_graph, residues):
 
 
 def find_sidechains(molecule_graph, residues):
-
-
-if __name__ == "__main__":
-    topology_data = amber.read_topology("/home/khs26/coords.prmtop")
-    molecule = amber.create_molecule(topology_data)
     # Identify chiral atoms
     atoms = molecule.atoms
     chiral_centres = chir.get_chiral_sets(atoms)
@@ -40,15 +35,29 @@ if __name__ == "__main__":
         if amides and nbs_n:
             amide_bond = (k, amides[0])
             n_bond = (k, nbs_n[0])
-            # Now find sidechains by cutting the Ca-C and Ca-N bonds
-            atoms.remove_edges_from([amide_bond, n_bond])
+            h_bond = (k, [h for h in nx.neighbors(atoms, k) if h.element == 'H'][0])
+            # Now find sidechains by cutting the Ca-C, Ca-N and Ca-H bonds
+            atoms.remove_edges_from([amide_bond, n_bond, h_bond])
             sidechain_atoms = [atom for atom in [comp for comp in nx.connected_components(atoms) if k in comp][0]
                                if type(atom) != chir.GhostAtom]
-            atoms.add_edges_from([amide_bond, n_bond])
+            atoms.add_edges_from([amide_bond, n_bond, h_bond])
             if not any([k in cycle for cycle in nx.cycle_basis(atoms.subgraph(sidechain_atoms))]):
-                sidechains[k] = sidechain_atoms
-    for k, v in sidechains.items():
-        print k, v
+                sidechains[k] = atoms.subgraph(sidechain_atoms)
+    return sidechains
 
-    find_sidechains(molecule, [res for res in molecule.residues.nodes() if 'T' in res.name])
+def residue_from_sidechain():
+    pass
+
+if __name__ == "__main__":
+    topology_data = amber.read_topology("/home/khs26/coords.prmtop")
+    molecule = amber.create_molecule(topology_data)
+    scs = find_sidechains(molecule, [res for res in molecule.residues.nodes() if 'T' in res.name])
+    for sc in scs:
+        for sc2 in scs:
+            if sc == sc2:
+                continue
+            if nx.is_isomorphic(scs[sc], scs[sc2], node_match=(lambda x, y: x['element'] == y['element'])):
+                print sc, sc2, "are isomorphic"
+                print sc.residue, sc2.residue
+                print nx.neighbors(scs[sc], sc)
     # test_coords = np.array(amber.read_amber_coords("/home/khs26/coords.inpcrd"))
