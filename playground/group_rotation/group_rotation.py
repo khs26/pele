@@ -97,10 +97,10 @@ if __name__ == "__main__":
     import playground.group_rotation.amino_acids as amino
     
     topology_data = amber.read_topology("/home/khs26/coords.prmtop")
-    parsed = amber.create_atoms_and_residues(topology_data)
+    parsed = amber.create_molecule(topology_data)
     test_params = amber.group_rotation_dict(parsed, amino.def_parameters)
     test_coords = np.array(amber.read_amber_coords("/home/khs26/coords.inpcrd"))
     testGR = GroupRotation(test_params)
     pre_coords = test_coords.copy()
     result = testGR.takeStep(test_coords)
-    print test_coords-pre_coords
+    print (test_coords-pre_coords).reshape(-1, 3)
