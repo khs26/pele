@@ -4,7 +4,7 @@ from morse_cluster import MorseCluster
 from pele.potentials import Morse
 from pele.mindist.periodic_exact_match import ExactMatchPeriodic, MeasurePeriodic
 from pele.mindist import optimize_permutations
-
+from pele.transition_states import InterpolateLinearMeasure
 
 def put_in_box(x, boxvec):
     x = x.reshape(-1, boxvec.size)
@@ -19,6 +19,9 @@ class MorseBulk(MorseCluster):
 
         self.boxvec = boxvec
         self.periodic = True
+        
+        self.params.double_ended_connect.local_connect_params.NEBparams.interpolator = InterpolateLinearMeasure(MeasurePeriodic(self.boxvec))
+
 
     def get_random_configuration(self):
         x = np.zeros([self.natoms, 3])
@@ -30,7 +33,9 @@ class MorseBulk(MorseCluster):
         return Morse(rho=self.rho, r0=self.r0, A=self.A, boxvec=self.boxvec, rcut=self.rcut)
 
     def draw(self, coordslinear, index):
+        from pele.systems._opengl_tools import draw_box
         put_in_box(coordslinear, self.boxvec)
+        draw_box(self.boxvec)
         MorseCluster.draw(self, coordslinear, index, subtract_com=False)
 
     def get_mindist(self):
@@ -48,7 +53,7 @@ class MorseBulk(MorseCluster):
         return None
 
 
-def rungui():
+def rungui():  # pragma: no cover
     from pele.gui import run_gui
 
     natoms = 17

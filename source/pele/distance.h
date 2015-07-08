@@ -7,7 +7,7 @@
 
 #include "array.h"
 
-/**
+/*
  * References on round etc:
  * http://www.cplusplus.com/reference/cmath/floor/
  * http://www.cplusplus.com/reference/cmath/ceil/
@@ -20,7 +20,7 @@
     }
 #endif
 
-/**
+/*
  * These classes and structs are used by the potentials to compute distances.
  * They must have a member function get_rij() with signature
  *
@@ -140,6 +140,7 @@ public:
 
     periodic_distance(Array<double> const box)
     {
+        static_assert(ndim > 0, "illegal box dimension");
         if (box.size() != _ndim) {
             throw std::invalid_argument("box.size() must be equal to ndim");
         }
@@ -151,23 +152,25 @@ public:
 
     periodic_distance()
     { 
+        static_assert(ndim > 0, "illegal box dimension");
         throw std::runtime_error("the empty constructor is not available for periodic boundaries"); 
     }
 
     inline void get_rij(double * const r_ij, double const * const r1,
                  double const * const r2) const
     {
-        static_assert(ndim > 0, "illegal box dimension");
         meta_periodic_distance<ndim>::f(r_ij, r1, r2, _box, _ibox);
     }
 
+    inline void put_atom_in_box(double * const x) const
+    {
+        meta_image<ndim>::f(x, _ibox, _box);
+    }
     inline void put_in_box(Array<double>& coords) const
     {
-        const size_t natoms = coords.size() / _ndim;
-        for (size_t i = 0; i < natoms; ++i){
-            const size_t i1 = i * _ndim;
-            static_assert(ndim > 0, "illegal box dimension");
-            meta_image<ndim>::f(&coords[i1], _ibox, _box);
+        const size_t N = coords.size();
+        for (size_t i = 0; i < N; i += _ndim){
+            put_atom_in_box(&coords[i]);
         }
     }
 };
