@@ -12,7 +12,7 @@ import pele.utils.elements as elem
 class Atom(object):
     """ Atom defined from the AMBER topology file. """
 
-    def __init__(self, index, name, mass, amber_atom_type, charge, molecule):
+    def __init__(self, index, name, mass, amber_atom_type, charge, molecule, **kwargs):
         self.index = int(index)
         self.name = name.strip()
         self.mass = float(mass)
@@ -149,7 +149,8 @@ def create_molecule(topology_data):
                                 topology_data["AMBER_ATOM_TYPE"],
                                 topology_data["CHARGE"],
                                 itertools.repeat(molecule)))
-    molecule.atoms.add_nodes_from(atoms)
+    atom_list = [(atom, atom.__dict__) for atom in atoms]
+    molecule.atoms.add_nodes_from(atom_list)
     # Create a list of residues and add them to the molecule's list of residues.
     # The 11th element of POINTERS is the residue count.
     residues = list(itertools.imap(Residue,
@@ -258,7 +259,7 @@ def get_rotated_atoms(bond):
             atom_b = residue_atom
     # Remove the edge, find the smallest subgraph and then add the edge back
     residue.molecule.atoms.remove_edge(atom_a, atom_b)
-    rotating_atoms = sorted(nx.connected_components(residue.molecule.atoms)[-1])
+    rotating_atoms = sorted(list(nx.connected_components(residue.molecule.atoms))[-1])
     residue.molecule.atoms.add_edge(atom_a, atom_b)
     if atom_a in rotating_atoms:
         atom_1 = atom_b
