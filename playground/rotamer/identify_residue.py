@@ -1,6 +1,6 @@
+import playground.rotamer.residue_sidechains as res_scs
 import pele.amber.read_amber as amber
 import playground.group_rotation.chirality as chir
-import numpy as np
 import networkx as nx
 
 
@@ -22,7 +22,7 @@ def res_atom_graph(molecule_graph, residues):
 
 def find_sidechains(molecule_graph, residues):
     # Identify chiral atoms
-    atoms = molecule.atoms
+    atoms = molecule_graph.atoms
     chiral_centres = chir.get_chiral_sets(atoms)
     # Identify sidechains (Ca-Cb-X), apart from proline and glycine.
     sidechains = {}
@@ -45,19 +45,24 @@ def find_sidechains(molecule_graph, residues):
                 sidechains[k] = atoms.subgraph(sidechain_atoms)
     return sidechains
 
-def residue_from_sidechain():
-    pass
+
+def residue_from_sidechain(sidechains):
+    residues = {}
+    for sc in sidechains:
+        for res in res_scs.amino_acids:
+            if nx.is_isomorphic(sidechains[sc], res_scs.amino_acids[res],
+                                node_match=(lambda x, y: x['element'] == y['element'])):
+                residues[sc] = res
+                break
+    return residues
+
 
 if __name__ == "__main__":
-    topology_data = amber.read_topology("/home/khs26/coords.prmtop")
+    import os.path
+    topology_data = amber.read_topology(os.path.normpath("C:/Users/khs26/Documents/coords.prmtop"))
     molecule = amber.create_molecule(topology_data)
-    scs = find_sidechains(molecule, [res for res in molecule.residues.nodes() if 'T' in res.name])
-    for sc in scs:
-        for sc2 in scs:
-            if sc == sc2:
-                continue
-            if nx.is_isomorphic(scs[sc], scs[sc2], node_match=(lambda x, y: x['element'] == y['element'])):
-                print sc, sc2, "are isomorphic"
-                print sc.residue, sc2.residue
-                print nx.neighbors(scs[sc], sc)
-    # test_coords = np.array(amber.read_amber_coords("/home/khs26/coords.inpcrd"))
+    scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
+    ress = residue_from_sidechain(scs)
+    for k, v in ress.items():
+        print k.residue, v
+

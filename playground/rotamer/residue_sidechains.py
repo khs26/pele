@@ -1,6 +1,6 @@
 import networkx as nx
-import copy
 import matplotlib.pyplot as plt
+
 
 def add_hydrogens(graph, number_dict):
     """ Adds hydrogens to heavy atoms in a sidechain graph.
@@ -8,11 +8,19 @@ def add_hydrogens(graph, number_dict):
     :param graph: sidechain graph
     :param number_dict: dictionary of number of hydrogens per heavy atom
     """
-    hydrogens = [''.join(["H", str(i)]) for i in range(0, sum(number_dict.values()))]
-    # hydrogens = [atom for atom in graph.nodes() if atom.rstrip("0123456789") == 'H']
+    hydrogens = ["".join(["H", str(i)]) for i in range(0, sum(number_dict.values()))]
     for heavy_atom in number_dict:
         for i in range(0, number_dict[heavy_atom]):
             graph.add_edge(heavy_atom, hydrogens.pop(0))
+
+
+def update_graph_dict(graph):
+    """ Updates the node dictionary for a graph with elements, so that it can be used in isomorphism tests.
+
+    :param graph: sidechain graph
+    """
+    for node in graph.nodes():
+        graph.node[node]["element"] = node.rstrip("0123456789")
 
 # A - Alanine
 # Not needed
@@ -67,10 +75,50 @@ add_hydrogens(phenylalanine, hydrogen_count)
 # Not needed
 
 # Hd - Histidine (delta protonated)
+backbone = [("C0", "C1"),
+            ("C1", "C2"),
+            ("C2", "C3"),
+            ("C3", "N0"),
+            ("N0", "C4"),
+            ("C4", "N1"),
+            ("N1", "C2")]
+hydrogen_count = {"C1": 2,
+                  "C3": 1,
+                  "C4": 1,
+                  "N1": 1}
+histidine_d = nx.Graph(backbone)
+add_hydrogens(histidine_d, hydrogen_count)
 
 # He - Histidine (epsilon protonated)
+backbone = [("C0", "C1"),
+            ("C1", "C2"),
+            ("C2", "C3"),
+            ("C3", "N0"),
+            ("N0", "C4"),
+            ("C4", "N1"),
+            ("N1", "C2")]
+hydrogen_count = {"C1": 2,
+                  "C3": 1,
+                  "C4": 1,
+                  "N0": 1}
+histidine_e = nx.Graph(backbone)
+add_hydrogens(histidine_e, hydrogen_count)
 
 # Hp - Histidine (both protonated)
+backbone = [("C0", "C1"),
+            ("C1", "C2"),
+            ("C2", "C3"),
+            ("C3", "N0"),
+            ("N0", "C4"),
+            ("C4", "N1"),
+            ("N1", "C2")]
+hydrogen_count = {"C1": 2,
+                  "C3": 1,
+                  "C4": 1,
+                  "N0": 1,
+                  "N1": 1}
+histidine_p = nx.Graph(backbone)
+add_hydrogens(histidine_p, hydrogen_count)
 
 # I - Isoleucine
 backbone = [("C0", "C1"),
@@ -194,6 +242,26 @@ valine = nx.Graph(backbone)
 add_hydrogens(valine, hydrogen_count)
 
 # W - Tryptophan
+backbone = [("C0", "C1"),
+            ("C1", "C2"),
+            ("C2", "C3"),
+            ("C3", "N0"),
+            ("C4", "C5"),
+            ("C5", "C6"),
+            ("C6", "C7"),
+            ("C7", "C8"),
+            ("C8", "C9"),
+            ("C9", "C4"),
+            ("C9", "C2")]
+hydrogen_count = {"C1": 2,
+                  "C3": 1,
+                  "N0": 1,
+                  "C5": 1,
+                  "C6": 1,
+                  "C7": 1,
+                  "C8": 1}
+tryptophan = nx.Graph(backbone)
+add_hydrogens(tryptophan, hydrogen_count)
 
 # Y - Tyrosine
 backbone = [("C0", "C1"),
@@ -214,5 +282,24 @@ hydrogen_count = {"C1": 2,
 tyrosine = nx.Graph(backbone)
 add_hydrogens(tyrosine, hydrogen_count)
 
-nx.draw_networkx(tyrosine)
-plt.show()
+amino_acids = {"CYS": cysteine,
+               "ASP": aspartate,
+               "GLU": glutamate,
+               "PHE": phenylalanine,
+               "HID": histidine_d,
+               "HIE": histidine_e,
+               "HIP": histidine_p,
+               "ILE": isoleucine,
+               "LYS": lysine,
+               "LEU": leucine,
+               "MET": methionine,
+               "ASN": asparagine,
+               "GLN": glutamine,
+               "ARG": arginine,
+               "SER": serine,
+               "THR": threonine,
+               "VAL": valine,
+               "TRP": tryptophan,
+               "TYR": tyrosine}
+
+map(update_graph_dict, amino_acids.values())
