@@ -33,6 +33,9 @@ hydrogen_count = {"C1": 2,
 cysteine = nx.Graph(backbone)
 add_hydrogens(cysteine, hydrogen_count)
 
+# Cx - Cysteine with salt bridge
+# Not needed (can't really compare non-salt bridged rotamer states)
+
 # D - Aspartate
 backbone = [("C0", "C1"),
             ("C1", "C2"),
@@ -198,15 +201,13 @@ add_hydrogens(glutamine, hydrogen_count)
 backbone = [("C0", "C1"),
             ("C1", "C2"),
             ("C2", "C3"),
-            ("C3", "C4"),
-            ("C4", "N0"),
-            ("N0", "C5"),
-            ("C5", "N1"),
-            ("C5", "N2")]
+            ("C3", "N0"),
+            ("N0", "C4"),
+            ("C4", "N1"),
+            ("C4", "N2")]
 hydrogen_count = {"C1": 2,
                   "C2": 2,
                   "C3": 2,
-                  "C4": 2,
                   "N0": 1,
                   "N1": 2,
                   "N2": 2}
@@ -246,6 +247,7 @@ backbone = [("C0", "C1"),
             ("C1", "C2"),
             ("C2", "C3"),
             ("C3", "N0"),
+            ("N0", "C4"),
             ("C4", "C5"),
             ("C5", "C6"),
             ("C6", "C7"),

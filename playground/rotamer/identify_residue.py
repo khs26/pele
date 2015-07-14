@@ -59,10 +59,9 @@ def residue_from_sidechain(sidechains):
 
 if __name__ == "__main__":
     import os.path
-    topology_data = amber.read_topology(os.path.normpath("C:/Users/khs26/Documents/coords.prmtop"))
+    topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
     molecule = amber.create_molecule(topology_data)
     scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
     ress = residue_from_sidechain(scs)
-    for k, v in ress.items():
+    for k, v in sorted(ress.items()):
         print k.residue, v
-
