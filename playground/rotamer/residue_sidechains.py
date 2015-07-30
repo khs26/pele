@@ -23,7 +23,10 @@ def update_graph_dict(graph):
         graph.node[node]["element"] = node.rstrip("0123456789")
 
 # A - Alanine
-# Not needed
+backbone = [("C0", "C1")]
+hydrogen_count = {"C1": 3}
+alanine = nx.Graph(backbone)
+add_hydrogens(alanine, hydrogen_count)
 
 # C - Cysteine
 backbone = [("C0", "C1"),
@@ -284,7 +287,8 @@ hydrogen_count = {"C1": 2,
 tyrosine = nx.Graph(backbone)
 add_hydrogens(tyrosine, hydrogen_count)
 
-amino_acids = {"CYS": cysteine,
+amino_acids = {"ALA": alanine,
+               "CYS": cysteine,
                "ASP": aspartate,
                "GLU": glutamate,
                "PHE": phenylalanine,
