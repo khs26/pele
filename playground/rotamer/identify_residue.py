@@ -47,21 +47,32 @@ def find_sidechains(molecule_graph, residues):
 
 
 def residue_from_sidechain(sidechains):
+    """ For each sidechain in sidechains, determines the type of residue and generates the mapping from the atom types
+    in residue_sidechains to atoms in the molecule.
+
+    :param sidechains: {Ca: sidechain atoms graph} dictionary
+    :return: residue: residue type and atom mapping dictionary
+    """
     residues = {}
+    mapping = {}
     for sc in sidechains:
         for res in res_scs.amino_acids:
-            if nx.is_isomorphic(sidechains[sc], res_scs.amino_acids[res],
-                                node_match=(lambda x, y: x['element'] == y['element'])):
-                residues[sc] = res
+            graph_match = nx.algorithms.isomorphism.GraphMatcher(res_scs.amino_acids[res], sidechains[sc],
+                                                                 node_match=(lambda x, y: x['element'] == y['element']))
+            if graph_match.is_isomorphic():
+                residues[sc.residue] = res
+                mapping[sc.residue] = graph_match.mapping
                 break
-    return residues
+    return residues, mapping
 
 
 if __name__ == "__main__":
     import os.path
-    topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
+    topology_data = amber.read_topology(os.path.normpath("B:/flu.prmtop"))
     molecule = amber.create_molecule(topology_data)
     scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
-    ress = residue_from_sidechain(scs)
+    ress, maps = residue_from_sidechain(scs)
     for k, v in sorted(ress.items()):
-        print k.residue, v
+         print k, v
+         for i, j in res_scs.dihedrals:
+            print i, j, chir.chiral_order(molecule.atoms, maps[k][i]), chir.chiral_order(molecule.atoms, maps[k][j])
