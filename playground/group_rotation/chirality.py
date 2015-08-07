@@ -42,8 +42,31 @@ def multi_bonds(atoms):
                 paired = True
 
 
-# if not paired:
-#      print "Could not find pair for atom", atom, atom.residue, atom.charge, nx.edges(atoms, atom)
+def chiral_order2(chiral_atom, depth=6):
+    import itertools
+    atoms = chiral_atom.molecule.atoms
+    tree = nx.bfs_tree(atoms, chiral_atom)
+    neighbours = sorted(nx.neighbors(atoms, chiral_atom), reverse=True)
+    to_compare = neighbours
+    cur_depth = 1
+    nodes_to_expand = list(itertools.chain(*[[i, i + 1] for i in xrange(len(to_compare) - 1) if to_compare[i] <= to_compare[i + 1]]))
+    while any(nodes_to_expand):
+        print nodes_to_expand
+        to_compare = [sorted(nx.single_source_shortest_path(tree, nb, cur_depth).values(), reverse=True) for nb in neighbours]
+        cur_depth += 1
+        print "Depth:", cur_depth, to_compare
+        print [to_compare[i][0] for i in xrange(len(to_compare))]
+        print to_compare[1], to_compare[2]
+        if cur_depth == depth:
+            unsorted = True
+            break
+        nodes_to_expand = list(itertools.chain(*[[i, i + 1] for i in xrange(len(to_compare) - 1) if to_compare[i] <= to_compare[i + 1]]))
+
+def append_neighbours(atom, tree):
+    if tree.successors(atom):
+        return [atom] + [sorted(tree.successors(atom), reverse=True)]
+    else:
+        return [atom]
 
 def chiral_order(atoms, chiral_atom, depth=6):
     # print "\n\nResidue:", chiral_atom.residue, "atom:", chiral_atom
