@@ -51,7 +51,8 @@ def residue_from_sidechain(sidechains):
     in residue_sidechains to atoms in the molecule.
 
     :param sidechains: {Ca: sidechain atoms graph} dictionary
-    :return: residue: residue type and atom mapping dictionary
+    :return: residues: residue type
+    :return: mapping:  atom mapping dictionary
     """
     residues = {}
     mapping = {}
@@ -70,9 +71,13 @@ if __name__ == "__main__":
     import os.path
     topology_data = amber.read_topology(os.path.normpath("B:/flu.prmtop"))
     molecule = amber.create_molecule(topology_data)
-    scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
-    ress, maps = residue_from_sidechain(scs)
-    for k, v in sorted(ress.items()):
-         print k, v
-         for i, j in res_scs.dihedrals:
-            print i, j, chir.chiral_order(molecule.atoms, maps[k][i]), chir.chiral_order(molecule.atoms, maps[k][j])
+    cands = chir.tetravalent_atoms(molecule.atoms)
+    chir.multi_bonds(molecule.atoms)
+    cands2 = chir.rankable_neighbours(cands)[0]
+    print len(molecule.atoms), len(cands), len(cands2)
+    # scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
+    # ress, maps = residue_from_sidechain(scs)
+    # for k, v in sorted(ress.items()):
+    #      print k, v
+    #      for i, j in res_scs.dihedrals:
+    #         print i, j, chir.chiral_order(molecule.atoms, maps[k][i]), chir.chiral_order(molecule.atoms, maps[k][j])

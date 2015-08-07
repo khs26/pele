@@ -3,6 +3,7 @@
 import pele.amber.read_amber as ra
 import networkx as nx
 import sys
+import itertools
 
 
 class GhostAtom(ra.Atom):
@@ -18,7 +19,13 @@ valences = {"H": 1,
             "P": 5}
 
 
-def chiral_candidates(atoms):
+def tetravalent_atoms(atoms):
+    """
+    Identifies possible candidates (those with 4 bonds)
+
+    :param atoms: Graph of atoms
+    :return: List of atoms with 4 bonds
+    """
     candidates = [atom for atom in atoms.nodes() if len(nx.edges(atoms, atom)) == 4]
     return candidates
 
@@ -42,31 +49,27 @@ def multi_bonds(atoms):
                 paired = True
 
 
-def chiral_order2(chiral_atom, depth=6):
-    import itertools
-    atoms = chiral_atom.molecule.atoms
-    tree = nx.bfs_tree(atoms, chiral_atom)
-    neighbours = sorted(nx.neighbors(atoms, chiral_atom), reverse=True)
-    to_compare = neighbours
-    cur_depth = 1
-    nodes_to_expand = list(itertools.chain(*[[i, i + 1] for i in xrange(len(to_compare) - 1) if to_compare[i] <= to_compare[i + 1]]))
-    while any(nodes_to_expand):
-        print nodes_to_expand
-        to_compare = [sorted(nx.single_source_shortest_path(tree, nb, cur_depth).values(), reverse=True) for nb in neighbours]
-        cur_depth += 1
-        print "Depth:", cur_depth, to_compare
-        print [to_compare[i][0] for i in xrange(len(to_compare))]
-        print to_compare[1], to_compare[2]
-        if cur_depth == depth:
-            unsorted = True
-            break
-        nodes_to_expand = list(itertools.chain(*[[i, i + 1] for i in xrange(len(to_compare) - 1) if to_compare[i] <= to_compare[i + 1]]))
+def rankable_neighbours(chiral_cands):
+    """ Checks if the chiral atom candidates have rankable substituents on each site (i.e. discounting those whose
+     neighbour list contains the same univalent atoms).
 
-def append_neighbours(atom, tree):
-    if tree.successors(atom):
-        return [atom] + [sorted(tree.successors(atom), reverse=True)]
-    else:
-        return [atom]
+    :param chiral_cands: Atoms to test.
+    :return: maybe_chiral, not_chiral: lists of possibly chiral and achiral atoms
+    """
+
+    maybe_chiral, not_chiral = [], []
+    for chiral_cand in chiral_cands:
+        atoms = chiral_cand.molecule.atoms
+        neighbours = atoms.neighbors(chiral_cand)
+        # Univalent atoms only have the original chiral_cand atom in their neighbour list. Possibly twice, because of
+        # the multi-bond routine.
+        univalent = [nb for nb in neighbours if all([nb2 == chiral_cand for nb2 in atoms.neighbors(nb)])]
+        if len(univalent) > 1 and any([x.mass == y.mass for x, y in itertools.combinations(univalent, 2)]):
+            not_chiral.append(chiral_cand)
+        else:
+            maybe_chiral.append(chiral_cand)
+    return maybe_chiral, not_chiral
+
 
 def chiral_order(atoms, chiral_atom, depth=6):
     # print "\n\nResidue:", chiral_atom.residue, "atom:", chiral_atom
@@ -106,8 +109,15 @@ def chiral_order(atoms, chiral_atom, depth=6):
         # ordered += [atom for atom in neighbors if atom.element == "H"]
     return ordered
 
+
 def get_chiral_sets(atoms):
-    chiral_cands = chiral_candidates(atoms)
+    """
+    Driver routine for all the chirality stuff.
+
+    :param atoms: Atom graph
+    :return: Dictionary of chiral centres and CIP-ordered neighbours
+    """
+    chiral_cands = tetravalent_atoms(atoms)
     multi_bonds(atoms)
     chiral_centres = {}
     for i, chiral_atom in enumerate(chiral_cands):
@@ -116,8 +126,10 @@ def get_chiral_sets(atoms):
             chiral_centres[chiral_atom] = ordered
     return chiral_centres
 
+
 def get_chiral_atoms(atoms):
     return get_chiral_sets(atoms).keys()
+
 
 def write_chirality_file(input_filename, output_filename):
     molecule = ra.parse_topology_file(input_filename)
