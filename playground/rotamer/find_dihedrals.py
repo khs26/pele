@@ -69,8 +69,10 @@ def map_dihedrals(residue_identities, residue_atom_map):
 
 if __name__ == "__main__":
     import os.path
+    import numpy as np
 
     topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
+    coords = np.array(amber.read_amber_coords(os.path.normpath("/home/khs26/flu.inpcrd"))).reshape((-1, 3))
     molecule = amber.create_molecule(topology_data)
     scs = find_sidechains(molecule)
     print scs
@@ -78,4 +80,4 @@ if __name__ == "__main__":
     print ress
     print maps
     for k, v in map_dihedrals(ress, maps).items():
-        print k, [map(lambda x: (x.name, x.index), dihedral) for dihedral in v]
+        print k, [map(lambda x: (x.name, x.index, coords[x.index]), dihedral) for dihedral in v]
