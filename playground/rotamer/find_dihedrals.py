@@ -42,11 +42,9 @@ def expand_dihedral(atom1, atom2):
 if __name__ == "__main__":
     import os.path
 
-    topology_data = amber.read_topology(os.path.normpath("B:/flu.prmtop"))
+    topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
     molecule = amber.create_molecule(topology_data)
     scs = find_sidechains(molecule, [res for res in molecule.residues.nodes()])
     ress, maps = residue_from_sidechain(scs)
-    for k, v in sorted(ress.items()):
-        print k, v
-        for i, j in res_scs.dihedrals:
-            print i, j, expand_dihedral(maps[k][i], maps[k][j])
+    print ress
+    print maps
