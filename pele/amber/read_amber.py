@@ -34,9 +34,8 @@ class Atom(object):
     def __repr__(self):
         return str(self.index) + " " + self.element + " " + self.name
 
-    def __cmp__(self, other):
-        """ Sort Atoms first by mass, then name, then index."""
-        return cmp((self.mass, self.name, self.index), (other.mass, other.name, other.index))
+    # def __cmp__(self, other):
+    #     return cmp(self.mass, other.mass)
 
 
 class Residue(object):
@@ -307,20 +306,11 @@ def default_parameters(topology_filename):
 
 
 if __name__ == "__main__":
-    topology_data = read_topology("/home/khs26/coords.prmtop")
+    import playground.group_rotation.chirality as chirality
+    topology_data = read_topology("/home/khs26/flu.prmtop")
     mol = create_molecule(topology_data)
-    # group_rot_dict = group_rotation_dict(mol, amino.def_parameters)
-    # print read_amber_coords("/home/khs26/coords.inpcrd")
-    # for item in group_rot_dict:
-    # print item, group_rot_dict[item]
-    mol.read_coords("/home/khs26/coords.inpcrd")
-    atom_indices = [node.index for node in mol.atoms.nodes()]
-    atoms = [node for node in mol.atoms.nodes()]
-    print atoms
-    atom_types = [a.element for a in atoms]
-    print atom_types
-    bonds = [(edge[0].index, edge[1].index) for edge in mol.atoms.edges_iter()]
-    print atom_indices
-    print bonds
-    for atom in sorted(atoms, key=op.attrgetter("index")):
-        print atom, atom.coords
+    mol.read_coords("/home/khs26/flu.inpcrd")
+
+    # for atom in mol.atoms:
+    #     if atom.name == 'CA' and atom.residue.name == 'ILE':
+    #         ca = atom
