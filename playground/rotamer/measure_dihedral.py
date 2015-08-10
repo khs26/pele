@@ -45,8 +45,6 @@ def dihedrals_with_symmetry(coords, residue, residue_ids, dihedrals):
     dihedral_values[residue] = [(dihedral, dihedral_angle(coords, dihedral)) for dihedral in dihedrals]
     # This compares against the list of residues which have symmetry.
     if residue_ids[residue] in ["ARG", "ASP", "GLU", "LEU", "PHE", "TYR", "VAL"]:
-        print "Changing final value:", residue
-        print 180.0 * dihedral_values[residue][-1][1] / np.pi, 180.0 * restrict_angle_value(dihedral_values[residue][-1][1], 2) / np.pi
         dihedral_values[residue][-1] = (dihedral_values[residue][-1][0], restrict_angle_value(dihedral_values[residue][-1][1], 2))
     else:
         dihedral_values[residue] = [(dihedral, dihedral_angle(coords, dihedral)) for dihedral in dihedrals]

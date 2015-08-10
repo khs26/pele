@@ -76,9 +76,9 @@ if __name__ == "__main__":
     coords = np.array(amber.read_amber_coords(os.path.normpath("/home/khs26/flu.inpcrd"))).reshape((-1, 3))
     molecule = amber.create_molecule(topology_data)
     scs = find_sidechains(molecule)
-    print scs
+    # print scs
     ress, maps = residue_from_sidechain(scs)
-    print ress
-    print maps
+    # print ress
+    # print maps
     for k, v in map_dihedrals(ress, maps).items():
-        print k, dihedrals_with_symmetry(coords, k, ress, v)
+        print dihedrals_with_symmetry(coords, k, ress, v)
