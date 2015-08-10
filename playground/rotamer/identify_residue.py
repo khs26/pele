@@ -20,7 +20,7 @@ def res_atom_graph(molecule_graph, residues):
     return molecule_graph.atoms.subgraph(res_atoms)
 
 
-def find_sidechains(molecule_graph, residues):
+def find_sidechains(molecule_graph):
     # Identify chiral atoms
     atoms = molecule_graph.atoms
     chiral_centres = chir.get_chiral_sets(atoms)
