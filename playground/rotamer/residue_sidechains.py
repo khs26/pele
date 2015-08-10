@@ -90,7 +90,7 @@ dihedral_chain["PHE"] = ("N-1", "C0", "C1", "C2", "C3")
 
 # G - Glycine
 # Not needed
-dihedral_chain["GLY": None]
+dihedral_chain["GLY"] = None
 
 # Hd - Histidine (delta protonated)
 heavy_atoms = [("C0", "C1"),
