@@ -70,6 +70,7 @@ def map_dihedrals(residue_identities, residue_atom_map):
 if __name__ == "__main__":
     import os.path
     import numpy as np
+    from playground.rotamer.measure_dihedral import dihedral_angle
 
     topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
     coords = np.array(amber.read_amber_coords(os.path.normpath("/home/khs26/flu.inpcrd"))).reshape((-1, 3))
@@ -80,4 +81,4 @@ if __name__ == "__main__":
     print ress
     print maps
     for k, v in map_dihedrals(ress, maps).items():
-        print k, [map(lambda x: (x.name, x.index, coords[x.index]), dihedral) for dihedral in v]
+        print k, [(dihedral, dihedral_angle(coords, dihedral) * 180.0 / np.pi) for dihedral in v]

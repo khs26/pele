@@ -4,7 +4,7 @@ Setup stage
 -----------
 
 *** Identify residues in the molecule - playground/rotamer/identify_residue.py
-* Find dihedrals and store atom identities.
+*** Find dihedrals and store atom identities. - playground/rotamer/find_dihedrals.py
 * Choose backbone-dependent, local environment etc. to determine what sort of library data to generate.
 * Read in relevant part of rotamer library data: store dictionary for each residue's rotamer states.
 
