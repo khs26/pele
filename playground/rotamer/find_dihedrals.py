@@ -1,7 +1,27 @@
 import pele.amber.read_amber as amber
-from identify_residue import find_sidechains, residue_from_sidechain
 import networkx as nx
 import playground.group_rotation.chirality as chirality
+
+class Dihedral(object):
+    def __init__(self, dihedral_atoms):
+        self.atoms = dihedral_atoms
+        self.residue = dihedral_atoms[0].residue
+        self.atom_graph = dihedral_atoms[0].molecule.atoms
+        self.get_moving_atoms()
+    def measure_dihedral(self, coords):
+        return dihedrals_with_symmetry(coords, self.residue, {self.residue: self.residue.get_identity()}, [self.atoms])
+    def get_moving_atoms(self):
+        """ Returns a list of moving atoms for a given dihedral.
+
+        :param dihedral: List of atoms which define the dihedral.
+        :param atom_graph: Atom graph.
+        :return moving_atoms: list of moving atoms.
+        """
+        self.atom_graph.remove_edge(dihedral[1], dihedral[2])
+        moving_atoms = [g for g in nx.connected_components(self.atom_graph) if dihedral[2] in g][0]
+        self.moving_atoms = [atom for atom in moving_atoms if not isinstance(atom, chirality.GhostAtom)]
+        self.atom_graph.add_edge(dihedral[1], dihedral[2])
+        return self.moving_atoms
 
 def map_dihedrals(residue_identities, residue_atom_map):
     """ Generates tuples of atoms in each dihedral for every residue.
@@ -30,36 +50,24 @@ def map_dihedrals(residue_identities, residue_atom_map):
         dihedral_dict[residue] = mapped_dihedrals
     return dihedral_dict
 
-def get_moving_atoms(dihedral, atom_graph):
-    """ Returns a list of moving atoms for a given dihedral.
-
-    :param dihedral: List of atoms which define the dihedral.
-    :param atom_graph: Atom graph.
-    :return moving_atoms: list of moving atoms.
-    """
-    atom_graph.remove_edge(dihedral[1], dihedral[2])
-    moving_atoms = [g for g in nx.connected_components(atom_graph) if dihedral[2] in g][0]
-    moving_atoms = [atom for atom in moving_atoms if not isinstance(atom, chirality.GhostAtom)]
-    atom_graph.add_edge(dihedral[1], dihedral[2])
-    return moving_atoms
-
-
 if __name__ == "__main__":
     import os.path
     import numpy as np
     from playground.rotamer.measure_dihedral import dihedrals_with_symmetry
+    import cProfile
 
+    pr = cProfile.Profile()
+    pr.enable()
     topology_data = amber.read_topology(os.path.normpath("/home/khs26/flu.prmtop"))
     coords = np.array(amber.read_amber_coords(os.path.normpath("/home/khs26/flu.inpcrd"))).reshape((-1, 3))
     molecule = amber.create_molecule(topology_data)
-    scs = find_sidechains(molecule)
-    # print scs
-    ress, maps = residue_from_sidechain(scs)
-    # print ress
-    # print maps
-    for k, v in map_dihedrals(ress, maps).items():
-        dihedral_dict = dihedrals_with_symmetry(coords, k, ress, v)
-        for k1, v1 in dihedral_dict.items():
-            for dihe in v1:
-                print k1, dihe[0]
-                print "moving:", get_moving_atoms(dihe[0], k1.molecule.atoms)
+    ress, maps = molecule.identify_residues()
+    dihedrals = []
+    for v in map_dihedrals(ress, maps).values():
+        for dihedral in v:
+            dihedrals.append(Dihedral(dihedral))
+    for dihe in dihedrals[0:2]:
+        print dihe.residue, dihe.atoms, dihe.moving_atoms
+        print dihe.measure_dihedral(coords)
+    pr.disable()
+    pr.print_stats('cumulative')
