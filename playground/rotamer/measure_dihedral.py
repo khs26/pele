@@ -49,3 +49,23 @@ def dihedrals_with_symmetry(coords, residue, residue_ids, dihedrals):
     else:
         dihedral_values[residue] = [(dihedral, dihedral_angle(coords, dihedral)) for dihedral in dihedrals]
     return dihedral_values
+
+
+def dihedral_with_symmetry(coords, dihedral):
+    """
+    Measures dihedral angles for a given dihedral, accounting for symmetry wrt rotation (e.g. carboxylate oxygens or
+    terminal methyls in leucine).
+
+    :param coords:
+    :param residue:
+    :param residue_ids:
+    :param dihedrals:
+    :return dihedral_values:
+    """
+    residue = dihedral.residue
+    # This compares against the list of residues which have symmetry.
+    if residue.identity in ["ARG", "ASP", "GLU", "LEU", "PHE", "TYR", "VAL"]:
+        angle = restrict_angle_value(dihedral_angle(coords, dihedral.atoms), 2)
+    else:
+        angle = dihedral_angle(coords, dihedral.atoms)
+    return angle

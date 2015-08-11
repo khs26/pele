@@ -1,6 +1,7 @@
 import pele.amber.read_amber as amber
 import networkx as nx
 import playground.group_rotation.chirality as chirality
+from playground.rotamer.measure_dihedral import dihedral_with_symmetry
 
 class Dihedral(object):
     def __init__(self, dihedral_atoms):
@@ -9,7 +10,9 @@ class Dihedral(object):
         self.atom_graph = dihedral_atoms[0].molecule.atoms
         self.get_moving_atoms()
     def measure_dihedral(self, coords):
-        return dihedrals_with_symmetry(coords, self.residue, {self.residue: self.residue.get_identity()}, [self.atoms])
+        return dihedral_with_symmetry(coords, self)
+    def change_dihedral(self, start_coords):
+        current_angle = self.measure_dihedral(start_coords)
     def get_moving_atoms(self):
         """ Returns a list of moving atoms for a given dihedral.
 
@@ -22,6 +25,7 @@ class Dihedral(object):
         self.moving_atoms = [atom for atom in moving_atoms if not isinstance(atom, chirality.GhostAtom)]
         self.atom_graph.add_edge(dihedral[1], dihedral[2])
         return self.moving_atoms
+
 
 def map_dihedrals(residue_identities, residue_atom_map):
     """ Generates tuples of atoms in each dihedral for every residue.
@@ -66,8 +70,8 @@ if __name__ == "__main__":
     for v in map_dihedrals(ress, maps).values():
         for dihedral in v:
             dihedrals.append(Dihedral(dihedral))
-    for dihe in dihedrals[0:2]:
+    for dihe in dihedrals:
         print dihe.residue, dihe.atoms, dihe.moving_atoms
-        print dihe.measure_dihedral(coords)
+        print "Angle:", dihe.measure_dihedral(coords)
     pr.disable()
     pr.print_stats('cumulative')
