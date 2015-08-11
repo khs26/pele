@@ -118,6 +118,7 @@ def get_chiral_sets(atoms):
     :return: Dictionary of chiral centres and CIP-ordered neighbours
     """
     chiral_cands = tetravalent_atoms(atoms)
+    chiral_cands = rankable_neighbours(chiral_cands)[0]
     multi_bonds(atoms)
     chiral_centres = {}
     for i, chiral_atom in enumerate(chiral_cands):
