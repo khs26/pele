@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 
 import pele.utils.elements as elem
-
+# import playground.rotamer.identify_residue as id_res
 
 class Atom(object):
     """ Atom defined from the AMBER topology file. """
@@ -45,6 +45,7 @@ class Residue(object):
         self.index = int(index)
         self.name = name.strip()
         self.molecule = molecule
+        self.identity = None
 
     def add_atoms(self, atoms):
         """ 
@@ -57,6 +58,16 @@ class Residue(object):
 
     def __repr__(self):
         return str(self.index) + " " + self.name
+
+    def get_identity(self):
+        if not self.identity:
+            try:
+                self.identity = self.molecule.res_identities[self]
+                self.atom_map = self.molecule.atom_map[self]
+            except AttributeError:
+                ident, atom_map = self.molecule.identify_residues()
+                self.identity, self.atom_map = ident[self], atom_map[self]
+        return self.identity
 
 
 class Molecule(object):
@@ -78,6 +89,15 @@ class Molecule(object):
 
     def num_atoms(self):
         return len(self.atoms.nodes())
+
+    def identify_residues(self):
+        import playground.rotamer.identify_residue as id_res
+        sidechains = id_res.find_sidechains(self)
+        self.res_identities, self.atom_maps = id_res.residue_from_sidechain(sidechains)
+        for res in self.res_identities:
+            res.identity = self.res_identities[res]
+            res.atom_map = self.atom_maps[res]
+        return self.res_identities, self.atom_maps
 
 
 def split_len(seq, length):
