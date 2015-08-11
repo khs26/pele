@@ -1,8 +1,7 @@
 import numpy as np
 
 def read_one_structure(lowest_file):
-    natoms_line = lowest_file.readline().strip()
-    natoms = int(natoms_line)
+    natoms = int(lowest_file.readline().strip())
     data_line = lowest_file.readline().split()
     index = int(data_line[3][:-1])
     energy = float(data_line[4])
@@ -10,7 +9,7 @@ def read_one_structure(lowest_file):
     coords = np.zeros([natoms, 3])
     for i in range(0, natoms):
         coords[i] = map(float, lowest_file.readline().split()[1:])
-    return index, energy, coords
+    return index, energy, first_found, coords
 
 def read_lowest(lowest_filename):
     structures = []
